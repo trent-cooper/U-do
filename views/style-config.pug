@@ -1,0 +1,22 @@
+extends layout
+
+block main
+  form(action="/users/config/standard" method="post")
+    fieldset.actions
+      button Default
+  form(action="/users/config/darkmode" method="post")
+    fieldset.actions
+      button Dark
+  form(action="/users/config/sand" method="post")
+    fieldset.actions
+      button Sand   
+  form(action="/users/config/wine" method="post")
+    fieldset.actions
+      button Wine   
+  form(action="/users/config/pop" method="post")
+    fieldset.actions
+      button Pop   
+
+block headerLinks
+  .actions
+    a.list(href="/lists") All Lists

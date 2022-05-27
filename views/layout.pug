@@ -9,6 +9,35 @@ html(lang="en-US")
     link(rel="stylesheet" href="/stylesheets/whitespace-reset.css")
     link(rel="stylesheet" href="/stylesheets/application.css")
     script(src="/javascripts/application.js")
+    if config
+      style(type="text/css").
+        body {
+          background-color: #{config.background};
+          color: #{config.textColor};
+        }
+        #lists li {
+          background-color: #{config.surface};
+        }
+        form input[type="submit"],
+        form fieldset button {
+          background-color: #{config.highlight1};
+        }
+        body > header h1 {
+          color: #{config.highlight1};
+        }
+        #lists li::before {
+          background-color: #{config.highlight1};
+        }
+        .flash {
+          background-color: #{config.highlight2};
+          color: #{config.background};
+        }
+        #todos header {
+          background-color: #{config.surface};
+        }
+        #todos header ul button {
+          color: #{config.textColor};
+        }
 
   body
     header
@@ -30,4 +59,5 @@ html(lang="en-US")
         form(action="/users/signout" method="post")
           fieldset.actions
             p Signed in as #{username}.
+            a.add(style="display:block" href="/users/config") ⚙️
             button Sign Out

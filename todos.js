@@ -1,20 +1,36 @@
 const config = require("./lib/config");
 const express = require("express");
+const mongoose = require("mongoose")
 const morgan = require("morgan");
 const flash = require("express-flash");
 const session = require("express-session");
+const themes = require("./lib/themes")
 const { body, validationResult } = require("express-validator");
 const store = require("connect-loki");
 const PgPersistence = require("./lib/pg-persistence");
 const catchError = require("./lib/catch-error");
+const { user } = require("pg/lib/defaults");
 
 const app = express();
 const host = config.HOST;
 const port = config.PORT;
 const LokiStore = store(session);
+let userId
 
 app.set("views", "./views");
 app.set("view engine", "pug");
+
+mongoose.connect('mongodb://localhost:27017/test1');
+const User = mongoose.model('User', {
+  username: String, 
+  styleConfig: {
+    background: String,
+    textColor: String,
+    surface: String,
+    highlight1: String,
+    highlight2: String,
+  }
+});
 
 app.use(morgan("common"));
 app.use(express.static("public"));
@@ -46,6 +62,7 @@ app.use((req, res, next) => {
   res.locals.username = req.session.username;
   res.locals.signedIn = req.session.signedIn;
   res.locals.flash = req.session.flash;
+
   delete req.session.flash;
   next();
 });
@@ -55,6 +72,16 @@ const requiresAuthentication = (req, res, next) => {
   if (!res.locals.signedIn) {
     res.redirect(302, "/users/signin");
   } else {
+    User.findOne({name: res.locals.username}, (err, userInfo) => {
+      if (!userInfo) {
+        userId = null
+        res.locals.userConfig = null
+      } else {
+        configInfo = userInfo.toObject()
+        userId = configInfo._id
+        res.locals.userConfig = configInfo.styleConfig
+      }
+    })
     next();
   }
 };
@@ -79,6 +106,7 @@ app.get("/lists",
     res.render("lists", {
       todoLists,
       todosInfo,
+      config: res.locals.userConfig,
     });
   })
 );
@@ -87,9 +115,41 @@ app.get("/lists",
 app.get("/lists/new",
   requiresAuthentication,
   (req, res) => {
-    res.render("new-list");
+    res.render("new-list", {
+      config: res.locals.userConfig,
+    });
   }
 );
+
+
+app.post("/users/config/:theme",
+  requiresAuthentication,
+  (req, res) => {
+
+  const id = req.params.id
+  const userInfo = new User({
+    username: req.session.username,
+    styleConfig: themes[req.params.theme]
+  })
+
+  if (userId === null) {
+    userInfo.save().then((userInfo) => {
+      console.log('User + config saved')
+      configInfo = userInfo.toObject()
+      res.locals._id = configInfo._id
+      res.locals.userConfig = themes[req.params.theme]
+      res.redirect("/lists")
+    })
+  } else {
+    console.log("in the theme update")
+    User.findOneAndUpdate({ username: req.session.username }, { styleConfig: themes[req.params.theme] })
+      .then(() => {
+        res.locals.userConfig = themes[req.params.theme]
+        res.redirect("/lists")
+      })
+  }
+
+});
 
 // Create a new todo list
 app.post("/lists",
@@ -146,6 +206,7 @@ app.get("/lists/:todoListId",
       todoList,
       isDoneTodoList: res.locals.store.isDoneTodoList(todoList),
       hasUndoneTodos: res.locals.store.hasUndoneTodos(todoList),
+      config: res.locals.userConfig,
     });
   })
 );
@@ -224,6 +285,7 @@ app.post("/lists/:todoListId/todos",
         isDoneTodoList: res.locals.store.isDoneTodoList(todoList),
         hasUndoneTodos: res.locals.store.hasUndoneTodos(todoList),
         flash: req.flash(),
+        config: res.locals.userConfig,
       });
     } else {
       let created = await res.locals.store.createTodo(+todoListId, todoTitle);
@@ -243,7 +305,7 @@ app.get("/lists/:todoListId/edit",
     let todoList = await res.locals.store.loadTodoList(+todoListId);
     if (!todoList) throw new Error("Not found.");
 
-    res.render("edit-list", { todoList });
+    res.render("edit-list", { todoList, config: res.locals.userConfig });
   })
 );
 
@@ -284,6 +346,7 @@ app.post("/lists/:todoListId/edit",
         todoListTitle,
         todoList,
         flash: req.flash(),
+        config: res.locals.userConfig,
       });
     };
 
@@ -313,11 +376,17 @@ app.post("/lists/:todoListId/edit",
   })
 );
 
+app.get("/users/config", requiresAuthentication, (req, res) => {
+  res.render("style-config", {
+    config: res.locals.userConfig
+  })
+})
+
 // Render the Sign In page.
 app.get("/users/signin", (req, res) => {
   req.flash("info", "Please sign in.");
   res.render("signin", {
-    flash: req.flash(),
+    flash: req.flash()
   });
 });
 
@@ -333,6 +402,7 @@ app.post("/users/signin",
       res.render("signin", {
         flash: req.flash(),
         username: req.body.username,
+        config: res.locals.userConfig,
       });
     } else {
       let session = req.session;
@@ -348,6 +418,7 @@ app.post("/users/signin",
 app.post("/users/signout", (req, res) => {
   delete req.session.username;
   delete req.session.signedIn;
+  userId = null;
   res.redirect("/users/signin");
 });
 
