@@ -72,7 +72,8 @@ const requiresAuthentication = (req, res, next) => {
   if (!res.locals.signedIn) {
     res.redirect(302, "/users/signin");
   } else {
-    User.findOne({name: res.locals.username}, (err, userInfo) => {
+    console.log(res.locals.username)
+    User.findOne({username: res.locals.username}, (err, userInfo) => {
       if (!userInfo) {
         userId = null
         res.locals.userConfig = null
