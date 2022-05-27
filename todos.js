@@ -16,6 +16,7 @@ const host = config.HOST;
 const port = config.PORT;
 const LokiStore = store(session);
 let userId
+let userConfig
 
 app.set("views", "./views");
 app.set("view engine", "pug");
@@ -73,14 +74,14 @@ const requiresAuthentication = (req, res, next) => {
     res.redirect(302, "/users/signin");
   } else {
     console.log(res.locals.username)
-    User.findOne({username: res.locals.username}, (err, userInfo) => {
+     User.findOne({username: res.locals.username}, (err, userInfo) => {
       if (!userInfo) {
         userId = null
-        res.locals.userConfig = null
+        userConfig = null
       } else {
         configInfo = userInfo.toObject()
         userId = configInfo._id
-        res.locals.userConfig = configInfo.styleConfig
+        userConfig = configInfo.styleConfig
       }
     })
     next();
@@ -107,7 +108,7 @@ app.get("/lists",
     res.render("lists", {
       todoLists,
       todosInfo,
-      config: res.locals.userConfig,
+      config: userConfig,
     });
   })
 );
@@ -117,7 +118,7 @@ app.get("/lists/new",
   requiresAuthentication,
   (req, res) => {
     res.render("new-list", {
-      config: res.locals.userConfig,
+      config: userConfig,
     });
   }
 );
@@ -137,15 +138,15 @@ app.post("/users/config/:theme",
     userInfo.save().then((userInfo) => {
       console.log('User + config saved')
       configInfo = userInfo.toObject()
-      res.locals._id = configInfo._id
-      res.locals.userConfig = themes[req.params.theme]
+      userId = configInfo._id
+      userConfig = themes[req.params.theme]
       res.redirect("/lists")
     })
   } else {
     console.log("in the theme update")
     User.findOneAndUpdate({ username: req.session.username }, { styleConfig: themes[req.params.theme] })
       .then(() => {
-        res.locals.userConfig = themes[req.params.theme]
+        userConfig = themes[req.params.theme]
         res.redirect("/lists")
       })
   }
@@ -207,7 +208,7 @@ app.get("/lists/:todoListId",
       todoList,
       isDoneTodoList: res.locals.store.isDoneTodoList(todoList),
       hasUndoneTodos: res.locals.store.hasUndoneTodos(todoList),
-      config: res.locals.userConfig,
+      config: userConfig,
     });
   })
 );
@@ -286,7 +287,7 @@ app.post("/lists/:todoListId/todos",
         isDoneTodoList: res.locals.store.isDoneTodoList(todoList),
         hasUndoneTodos: res.locals.store.hasUndoneTodos(todoList),
         flash: req.flash(),
-        config: res.locals.userConfig,
+        config: userConfig,
       });
     } else {
       let created = await res.locals.store.createTodo(+todoListId, todoTitle);
@@ -306,7 +307,7 @@ app.get("/lists/:todoListId/edit",
     let todoList = await res.locals.store.loadTodoList(+todoListId);
     if (!todoList) throw new Error("Not found.");
 
-    res.render("edit-list", { todoList, config: res.locals.userConfig });
+    res.render("edit-list", { todoList, config: userConfig });
   })
 );
 
@@ -347,7 +348,7 @@ app.post("/lists/:todoListId/edit",
         todoListTitle,
         todoList,
         flash: req.flash(),
-        config: res.locals.userConfig,
+        config: userConfig,
       });
     };
 
@@ -379,7 +380,7 @@ app.post("/lists/:todoListId/edit",
 
 app.get("/users/config", requiresAuthentication, (req, res) => {
   res.render("style-config", {
-    config: res.locals.userConfig
+    config: userConfig
   })
 })
 
@@ -403,7 +404,7 @@ app.post("/users/signin",
       res.render("signin", {
         flash: req.flash(),
         username: req.body.username,
-        config: res.locals.userConfig,
+        config: userConfig,
       });
     } else {
       let session = req.session;
@@ -420,6 +421,7 @@ app.post("/users/signout", (req, res) => {
   delete req.session.username;
   delete req.session.signedIn;
   userId = null;
+  userConfig = null;
   res.redirect("/users/signin");
 });
 
